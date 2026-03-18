@@ -403,8 +403,28 @@ def parse_ats_report(report: str) -> dict[str, Any]:
     skill_match = re.search(r"skills?\s*match\s*[:\-]?\s*(\d{1,3})\s*%", report, flags=re.IGNORECASE)
     missing_count = re.search(r"missing\s*skills\s*(?:count|total)?\s*[:\-]?\s*(\d{1,3})", report, flags=re.IGNORECASE)
 
-    technical = parse_marked_list(extract_section(report, [r"Top\s*10\s*Technical\s*Skills", r"Technical\s*Skills"]))
-    soft = parse_marked_list(extract_section(report, [r"Top\s*5\s*Soft\s*Skills", r"Soft\s*Skills"]))
+    technical = parse_marked_list(
+        extract_section(
+            report,
+            [
+                r"Top\s*10\s*Technical\s*Skills",
+                r"Technical\s*Skills",
+                r"Core\s*Technical\s*Skills",
+                r"Required\s*Technical\s*Skills",
+            ],
+        )
+    )
+    soft = parse_marked_list(
+        extract_section(
+            report,
+            [
+                r"Top\s*5\s*Soft\s*Skills",
+                r"Soft\s*Skills",
+                r"Behavioral\s*Skills",
+                r"Collaboration\s*Skills",
+            ],
+        )
+    )
     responsibilities = parse_marked_list(extract_section(report, [r"Key\s*Responsibilities", r"Responsibilities"]))
     keywords = parse_marked_list(extract_section(report, [r"ATS\s*Keywords", r"Keywords", r"Keyword\s*Targets"]))
 
@@ -429,6 +449,91 @@ def parse_ats_report(report: str) -> dict[str, Any]:
         "strong_skills": strong,
         "optimized_summary": optimized_summary,
         "optimized_bullets": optimized_bullets,
+    }
+
+
+def infer_lists_from_jd(jd: str) -> dict[str, list[str]]:
+    if not jd.strip():
+        return {"technical_skills": [], "soft_skills": [], "keywords": []}
+
+    lower = jd.lower()
+    tech_candidates = [
+        "python",
+        "java",
+        "go",
+        "node",
+        "typescript",
+        "javascript",
+        "react",
+        "sql",
+        "postgres",
+        "mysql",
+        "redis",
+        "kafka",
+        "aws",
+        "gcp",
+        "azure",
+        "docker",
+        "kubernetes",
+        "airflow",
+        "spark",
+        "llm",
+        "rag",
+        "etl",
+        "api",
+        "microservices",
+    ]
+    soft_candidates = [
+        "communication",
+        "collaboration",
+        "leadership",
+        "mentoring",
+        "ownership",
+        "stakeholder",
+        "problem solving",
+        "adaptability",
+        "teamwork",
+    ]
+
+    technical = [s for s in tech_candidates if re.search(rf"\b{re.escape(s)}\b", lower)]
+    soft = [s.title() for s in soft_candidates if re.search(rf"\b{re.escape(s)}\b", lower)]
+
+    keyword_pattern = re.compile(r"\b[A-Za-z][A-Za-z0-9+\-#/]{2,}\b")
+    raw_tokens = keyword_pattern.findall(jd)
+    stop_words = {
+        "the",
+        "and",
+        "for",
+        "with",
+        "you",
+        "our",
+        "will",
+        "this",
+        "that",
+        "are",
+        "from",
+        "have",
+        "your",
+        "years",
+        "experience",
+        "required",
+        "preferred",
+        "ability",
+    }
+    keywords: list[str] = []
+    for token in raw_tokens:
+        lower_token = token.lower()
+        if lower_token in stop_words:
+            continue
+        if lower_token not in [k.lower() for k in keywords]:
+            keywords.append(token)
+        if len(keywords) >= 20:
+            break
+
+    return {
+        "technical_skills": technical[:12],
+        "soft_skills": soft[:8],
+        "keywords": keywords,
     }
 
 
@@ -908,12 +1013,12 @@ def render_cover_letter_tab(api_key: str, model: str, role_mode: str, jd: str, r
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("Use this", use_container_width=True):
+        if st.button("Use this", use_container_width=True, key="cover_use_this"):
             st.session_state.active_cover_letter = st.session_state.cover_letter_text
             st.session_state.accepted_changes["cover_letter"] = True
             st.success("Stored as active cover letter.")
     with c2:
-        if st.button("Regenerate", use_container_width=True):
+        if st.button("Regenerate", use_container_width=True, key="cover_regenerate"):
             if not api_key.strip() or not jd.strip() or not resume_tex.strip():
                 st.warning("Need API key + JD + resume source to regenerate cover letter.")
             else:
@@ -926,7 +1031,7 @@ def render_cover_letter_tab(api_key: str, model: str, role_mode: str, jd: str, r
                     except Exception as exc:
                         st.error(f"Cover letter regeneration failed: {exc}")
     with c3:
-        if st.button("Copy-ready", use_container_width=True):
+        if st.button("Copy-ready", use_container_width=True, key="cover_copy_ready"):
             st.code(st.session_state.cover_letter_text.strip() or "No cover letter text available.", language="text")
 
     st.download_button(
@@ -935,6 +1040,7 @@ def render_cover_letter_tab(api_key: str, model: str, role_mode: str, jd: str, r
         file_name="cover_letter.txt",
         mime="text/plain",
         use_container_width=True,
+        key="cover_tab_download_txt",
     )
     st.download_button(
         "Download cover_letter.md",
@@ -942,6 +1048,7 @@ def render_cover_letter_tab(api_key: str, model: str, role_mode: str, jd: str, r
         file_name="cover_letter.md",
         mime="text/markdown",
         use_container_width=True,
+        key="cover_tab_download_md",
     )
 
 
@@ -971,15 +1078,15 @@ def render_radar_chart(scores: dict[str, int]) -> None:
 
 def apply_selected_changes() -> None:
     accepted = st.session_state.accepted_changes
-    if st.button("Apply optimized summary", use_container_width=True):
+    if st.button("Apply optimized summary", use_container_width=True, key="apply_summary"):
         accepted["summary"] = True
-    if st.button("Apply optimized bullets", use_container_width=True):
+    if st.button("Apply optimized bullets", use_container_width=True, key="apply_bullets"):
         accepted["bullets"] = True
-    if st.button("Apply optimized skills", use_container_width=True):
+    if st.button("Apply optimized skills", use_container_width=True, key="apply_skills"):
         accepted["skills"] = True
-    if st.button("Apply cover letter", use_container_width=True):
+    if st.button("Apply cover letter", use_container_width=True, key="apply_cover_letter"):
         accepted["cover_letter"] = True
-    if st.button("Apply all changes", use_container_width=True, type="primary"):
+    if st.button("Apply all changes", use_container_width=True, type="primary", key="apply_all"):
         for key in accepted.keys():
             accepted[key] = True
 
@@ -1045,19 +1152,47 @@ def render_downloads(report: str, final_tex: str, pdf_bytes: bytes | None, cover
     c1, c2, c3, c4 = st.columns(4, gap="medium")
     with c1:
         st.markdown('<div class="download-card"><p class="card-title">ATS Report</p><p class="card-subtitle">Markdown ATS and analysis report.</p></div>', unsafe_allow_html=True)
-        st.download_button("Download ats_report.md", data=report.encode("utf-8"), file_name="ats_report.md", mime="text/markdown", use_container_width=True)
+        st.download_button(
+            "Download ats_report.md",
+            data=report.encode("utf-8"),
+            file_name="ats_report.md",
+            mime="text/markdown",
+            use_container_width=True,
+            key="download_ats_md",
+        )
     with c2:
         st.markdown('<div class="download-card"><p class="card-title">Optimized LaTeX</p><p class="card-subtitle">Final accepted resume in `.tex` format.</p></div>', unsafe_allow_html=True)
-        st.download_button("Download optimized_resume.tex", data=final_tex.encode("utf-8"), file_name="optimized_resume.tex", mime="text/plain", use_container_width=True)
+        st.download_button(
+            "Download optimized_resume.tex",
+            data=final_tex.encode("utf-8"),
+            file_name="optimized_resume.tex",
+            mime="text/plain",
+            use_container_width=True,
+            key="download_resume_tex",
+        )
     with c3:
         st.markdown('<div class="download-card"><p class="card-title">Compiled PDF</p><p class="card-subtitle">Two-pass `pdflatex` output when available.</p></div>', unsafe_allow_html=True)
         if pdf_bytes:
-            st.download_button("Download optimized_resume.pdf", data=pdf_bytes, file_name="optimized_resume.pdf", mime="application/pdf", use_container_width=True)
+            st.download_button(
+                "Download optimized_resume.pdf",
+                data=pdf_bytes,
+                file_name="optimized_resume.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="download_resume_pdf",
+            )
         else:
-            st.button("PDF unavailable", disabled=True, use_container_width=True)
+            st.button("PDF unavailable", disabled=True, use_container_width=True, key="download_pdf_unavailable")
     with c4:
         st.markdown('<div class="download-card"><p class="card-title">Cover Letter</p><p class="card-subtitle">Active cover letter export.</p></div>', unsafe_allow_html=True)
-        st.download_button("Download cover_letter.txt", data=cover_letter.encode("utf-8"), file_name="cover_letter.txt", mime="text/plain", use_container_width=True)
+        st.download_button(
+            "Download cover_letter.txt",
+            data=cover_letter.encode("utf-8"),
+            file_name="cover_letter.txt",
+            mime="text/plain",
+            use_container_width=True,
+            key="download_cover_txt",
+        )
 
 
 def render_debug_panel(raw_output: str, report: str, pdf_error: str, parsing_issue: str) -> None:
@@ -1158,6 +1293,13 @@ def main() -> None:
                 st.stop()
 
             parsed = parse_ats_report(report)
+            inferred_from_jd = infer_lists_from_jd(jd)
+            if not parsed.get("technical_skills"):
+                parsed["technical_skills"] = inferred_from_jd["technical_skills"]
+            if not parsed.get("soft_skills"):
+                parsed["soft_skills"] = inferred_from_jd["soft_skills"]
+            if not parsed.get("keywords"):
+                parsed["keywords"] = inferred_from_jd["keywords"]
             metrics = infer_metrics(parsed, report)
             recruiter = parse_recruiter_feedback(report)
             strength_scores = parse_strength_scores(report, metrics)
