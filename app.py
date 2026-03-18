@@ -16,6 +16,7 @@ PROMPTS_DIR = APP_DIR / "prompts"
 BASE_RESUME_PATH = APP_DIR / "base_resume.tex"
 OUTPUTS_DIR = APP_DIR / "outputs"
 OUTPUTS_DIR.mkdir(exist_ok=True)
+OUTPUT_PDF_PATH = OUTPUTS_DIR / "optimized_resume.pdf"
 
 DEFAULT_MODEL = "gpt-4.1"
 MODEL_OPTIONS = [
@@ -318,6 +319,15 @@ def compile_pdf(tex_content: str) -> tuple[bytes | None, str | None]:
         return None, str(exc)
 
 
+def load_cached_pdf() -> bytes | None:
+    if OUTPUT_PDF_PATH.exists():
+        try:
+            return OUTPUT_PDF_PATH.read_bytes()
+        except Exception:
+            return None
+    return None
+
+
 def run_agent(api_key: str, model: str, jd: str, resume_tex: str) -> tuple[str, str, str]:
     client = OpenAI(api_key=api_key)
     system_prompt = load_prompt("system_prompt.txt")
@@ -521,12 +531,14 @@ def render_downloads(report: str, optimized_tex: str, pdf_bytes: bytes | None) -
 
 
 def init_state() -> None:
+    cached_pdf = load_cached_pdf()
     defaults = {
         "raw_output": "",
         "report": "",
         "optimized_tex": "",
-        "pdf_bytes": None,
+        "pdf_bytes": cached_pdf,
         "pdf_error": "",
+        "pdf_from_cache": bool(cached_pdf),
         "parsed": {},
         "metrics": {},
         "last_resume_source": "",
@@ -626,13 +638,21 @@ def main() -> None:
             tex_path.write_text(optimized_tex, encoding="utf-8")
 
             if pdf_bytes:
-                (OUTPUTS_DIR / "optimized_resume.pdf").write_bytes(pdf_bytes)
+                OUTPUT_PDF_PATH.write_bytes(pdf_bytes)
+            else:
+                cached_pdf = load_cached_pdf()
+                if cached_pdf:
+                    pdf_bytes = cached_pdf
+                    pdf_error = (pdf_error + "\n\n" if pdf_error else "") + (
+                        "Using last successfully compiled PDF from outputs/optimized_resume.pdf."
+                    )
 
             st.session_state.raw_output = raw_output
             st.session_state.report = report
             st.session_state.optimized_tex = optimized_tex
             st.session_state.pdf_bytes = pdf_bytes
             st.session_state.pdf_error = pdf_error or ""
+            st.session_state.pdf_from_cache = bool(pdf_bytes) and bool(pdf_error)
             st.session_state.parsed = parsed
             st.session_state.metrics = metrics
             st.session_state.last_resume_source = resume_source
@@ -669,6 +689,8 @@ def main() -> None:
 
         with tabs[3]:
             render_resume_tab(st.session_state.parsed, st.session_state.optimized_tex, st.session_state.pdf_bytes)
+            if st.session_state.pdf_from_cache:
+                st.info("PDF download is available from the last successful compilation.")
             if st.session_state.pdf_error:
                 st.warning("PDF could not be compiled automatically.")
                 with st.expander("Compilation log"):
