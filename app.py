@@ -148,8 +148,8 @@ def split_output(output: str) -> tuple[str, str]:
     cleaned = strip_code_fences(output)
 
     marker_patterns = [
-        r"SECTION\s*2\s*(?:—|–|-|:)\s*UPDATED\s*LATEX\s*RESUME",
-        r"SECTION\s*2\s*(?:—|–|-|:)",
+        r"SECTION\s*2\s*[—–-:]\s*UPDATED\s*LATEX\s*RESUME",
+        r"SECTION\s*2\s*[—–-:]",
         r"SECTION\s*2\b",
     ]
 
