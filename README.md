@@ -1,78 +1,126 @@
-# Resume Optimizer Agent (Premium Streamlit Dashboard)
+# Resume Optimizer Agent — Premium AI Career Copilot
 
-A recruiter-grade, dark-theme Streamlit SaaS interface for optimizing LaTeX resumes against a target Job Description (JD).
+A polished, dark-theme Streamlit dashboard that upgrades a standard resume optimizer into a premium SaaS-style career copilot.
 
 ## Overview
 
-Resume Optimizer Agent accepts a JD + LaTeX resume, runs OpenAI analysis/generation, and produces:
+Resume Optimizer Agent accepts:
 
-- ATS report with score + breakdown
-- JD keyword extraction
-- Skill gap analysis
-- Rewritten professional summary
-- Optimized bullet points
-- Full optimized LaTeX resume
-- Compiled PDF (when `pdflatex` is installed)
+- a target Job Description (required)
+- an optional `.tex` resume upload
+- bundled `base_resume.tex` fallback (when upload is missing)
 
-The app preserves fallback behavior using `base_resume.tex` when no resume file is uploaded.
+It preserves the original OpenAI optimization flow and now adds recruiter simulation, role-mode optimization, resume diffs, cover letter generation, radar scoring, and selective apply controls.
 
 ---
 
-## Features
+## Core Features
 
-### Premium Dashboard UI
+### 1) Recruiter Simulation Engine
 
-- Dark, glassmorphism-inspired SaaS design
-- Gradient hero header with feature badges
-- Styled sidebar controls and status panel
-- Card-based information architecture
-- Metric cards for ATS overview
-- Tabbed analysis workspace
-- Styled download cards and action buttons
-- Collapsed debug/logs panel for diagnostics
+After generation, the app shows a recruiter-style hiring panel with:
 
-### Functional Workflow
+- verdict (`Reject`, `Borderline`, `Shortlist`, `Strong Hire`)
+- confidence score (0–100)
+- reasons for verdict
+- what is working well
+- what needs fixing
+- top recommendations
 
-1. Input JD text.
-2. Upload optional `.tex` resume.
-3. Fallback to bundled `base_resume.tex` if upload is missing and fallback is enabled.
-4. Generate ATS report + optimized LaTeX via OpenAI.
-5. Compile LaTeX to PDF (two-pass `pdflatex`).
-6. Download:
-   - `ats_report.md`
-   - `optimized_resume.tex`
-   - `optimized_resume.pdf`
+Color-coded verdict badges and a prominent recruiter card are included.
 
-### Robust Parsing
+### 2) Role-Specific Optimization Mode
 
-- Handles section marker variations, including different punctuation and casing.
-- Supports markdown fenced LaTeX blocks.
-- Uses regex + safe fallbacks for:
-  - ATS score
-  - keyword/skills match
-  - missing skills count
-  - technical/soft skills
-  - responsibilities
-  - keywords
-  - missing/weak/strong skill groups
-  - summary and bullet sections
+Sidebar role selector:
+
+- Backend Engineer
+- Full Stack Engineer
+- GenAI Engineer
+- Data Engineer
+
+Role mode directly modifies prompt behavior so optimization emphasizes role-relevant outcomes.
+
+### 3) Resume Diff Viewer
+
+Dedicated **Diff Viewer** tab with before/after comparisons for:
+
+- summary
+- bullets
+
+Uses stable card-based side-by-side comparisons (best effort bullet pairing).
+
+### 4) JD-Aligned Cover Letter Generator
+
+Dedicated **Cover Letter** tab with:
+
+- editable large text area
+- **Use this** button (stores active cover letter in session)
+- **Regenerate** button (new LLM version)
+- **Copy-ready** button (plain text presentation)
+- download support (`cover_letter.txt`, `cover_letter.md`)
+
+### 5) Resume Strength Radar Chart
+
+Radar/spider chart dimensions:
+
+- Technical Depth
+- Impact
+- Keywords
+- Clarity
+- ATS Score
+
+Values are parsed when available and inferred safely when missing.
+
+### 6) ATS Score + Breakdown Metrics
+
+Polished metric cards for:
+
+- ATS Score
+- Keyword Match %
+- Skills Match %
+- Missing Skills Count
+
+With estimate labeling when values are inferred.
+
+### 7) PDF Compilation + Download
+
+Preserved and improved two-pass `pdflatex` compilation:
+
+- compile in temp directory
+- run `pdflatex` twice
+- capture logs
+- inline PDF preview when available
+- fallback to `.tex` download even when compile fails
+
+### 8) Premium Styling System
+
+Reusable design classes and dark SaaS styling including:
+
+- hero banner
+- glass/section cards
+- metric cards
+- recruiter card + verdict badge
+- diff cards
+- radar and cover letter cards
+- status/download cards
 
 ---
 
-## UI Information Architecture
+## App Sections
 
-1. **Hero Header**
-2. **Sidebar Controls**
-3. **Input Workspace**
-4. **ATS Overview Metrics**
-5. **Analysis Tabs**
+1. **Hero Header** (title, subtitle, feature badges, How-it-works expander)
+2. **Sidebar** (API key, model, role mode, upload/fallback controls, status card)
+3. **Input Workspace** (JD editor + resume source summary)
+4. **ATS Metrics Row** (4 metric cards)
+5. **Recruiter Simulation Card**
+6. **Tabs**:
    - JD Breakdown
-   - Skill Gap Analysis
-   - Bullet Improvements
+   - Skill Gap
+   - Diff Viewer
+   - Cover Letter
    - Optimized Resume
    - Downloads
-6. **PDF Preview** (inside Optimized Resume tab)
-7. **Debug / Logs** (collapsed)
+   - Debug
 
 ---
 
@@ -82,7 +130,7 @@ The app preserves fallback behavior using `base_resume.tex` when no resume file 
 
 - Python 3.10+
 - OpenAI API key
-- Optional (recommended): LaTeX with `pdflatex` for PDF generation
+- Optional: local LaTeX distribution with `pdflatex`
 
 ### Install
 
@@ -96,21 +144,6 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Then open the local Streamlit URL printed in your terminal.
-
----
-
-## Configuration Notes
-
-- API key can be provided in:
-  - Sidebar input field, or
-  - `OPENAI_API_KEY` environment variable.
-- Model is selectable in the sidebar.
-- Resume source behavior:
-  - Uploaded `.tex` takes priority.
-  - If none uploaded and fallback enabled, `base_resume.tex` is used.
-  - If fallback disabled and no upload provided, generation is blocked.
-
 ---
 
 ## File Structure
@@ -120,6 +153,7 @@ Then open the local Streamlit URL printed in your terminal.
 ├── app.py
 ├── base_resume.tex
 ├── requirements.txt
+├── README.md
 ├── prompts/
 │   ├── system_prompt.txt
 │   └── user_prompt.txt
@@ -131,60 +165,33 @@ Then open the local Streamlit URL printed in your terminal.
 
 ---
 
-## PDF Generation Details
-
-- Optimized `.tex` is written to a temporary directory.
-- `pdflatex` runs **twice** with:
-  - `-interaction=nonstopmode`
-  - `-halt-on-error`
-- On success:
-  - PDF bytes are returned
-  - file is saved under `outputs/optimized_resume.pdf`
-  - inline PDF preview is shown in the app
-- On failure:
-  - compile logs are surfaced in Debug/Logs
-  - `.md` and `.tex` downloads remain available
-  - previous successful PDF may be reused from cache when present
-
----
-
 ## Troubleshooting
 
 ### Missing API key
 
-- Symptom: generation blocked with error.
-- Fix: provide a valid key in sidebar or export `OPENAI_API_KEY`.
+- Add key in sidebar or set `OPENAI_API_KEY` environment variable.
 
-### Missing JD text
+### Missing JD
 
-- Symptom: generation blocked.
-- Fix: paste complete job description into JD editor.
+- Provide full job description text in the input area.
 
-### No resume source
+### No resume source loaded
 
-- Symptom: generation blocked.
-- Fix: upload `.tex` or enable bundled base resume fallback.
+- Upload `.tex`, or enable bundled fallback.
 
-### PDF compile fails
+### PDF compile errors
 
-- Symptom: no PDF preview/download.
-- Fixes:
-  - install LaTeX/`pdflatex`
-  - inspect compile logs in Debug/Logs
-  - still download `.tex`, fix LaTeX locally, and compile offline
+- Install LaTeX/`pdflatex` and check Debug tab logs.
+- You can still download optimized `.tex`.
 
-### Parsing quality issues
+### Parsing variability
 
-- Symptom: partial metrics or sections not extracted.
-- Fix: inspect raw model output in Debug/Logs and adjust prompts/format if needed.
+- Model output formatting can vary; parser uses regex + fallbacks.
+- Use Debug tab to inspect raw output and parsed sections.
 
 ---
 
-## Prompt Files
+## Notes
 
-Prompt templates remain in:
-
-- `prompts/system_prompt.txt`
-- `prompts/user_prompt.txt`
-
-No prompt changes are required for the upgraded dashboard.
+- Existing behavior is preserved: ATS report + optimized LaTeX + optional PDF generation with downloads.
+- Prompt files are unchanged; role-specific and extended output instructions are appended dynamically in `app.py`.
