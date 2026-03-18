@@ -146,18 +146,19 @@ def strip_code_fences(text: str) -> str:
 def split_output(output: str) -> tuple[str, str]:
     """Split model output into ATS report and LaTeX content with marker fallbacks."""
     cleaned = strip_code_fences(output)
+    normalized = cleaned.replace("—", "-").replace("–", "-")
 
     marker_patterns = [
-        r"SECTION\s*2\s*[—–-:]\s*UPDATED\s*LATEX\s*RESUME",
-        r"SECTION\s*2\s*[—–-:]",
+        r"SECTION\s*2\s*[:-]\s*UPDATED\s*LATEX\s*RESUME",
+        r"SECTION\s*2\s*[:-]",
         r"SECTION\s*2\b",
     ]
 
     for pattern in marker_patterns:
-        parts = re.split(pattern, cleaned, maxsplit=1, flags=re.IGNORECASE)
-        if len(parts) == 2:
-            report = parts[0].strip()
-            tex = strip_code_fences(parts[1])
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if match:
+            report = cleaned[: match.start()].strip()
+            tex = strip_code_fences(cleaned[match.end() :])
             return report, tex
 
     # fallback by locating LaTeX document start
