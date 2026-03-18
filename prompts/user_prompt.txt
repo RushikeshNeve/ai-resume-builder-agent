@@ -1,0 +1,11 @@
+JOB DESCRIPTION:
+{job_description}
+
+BASE RESUME (LATEX):
+{resume_tex}
+
+Run the resume optimization workflow.
+
+Return:
+SECTION 1 — COMPREHENSIVE ATS REPORT
+SECTION 2 — UPDATED LATEX RESUME
