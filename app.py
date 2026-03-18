@@ -172,9 +172,16 @@ def split_output(output: str) -> tuple[str, str]:
 
 def parse_ats_report(report: str) -> dict[str, Any]:
     def extract_section(title: str) -> str:
-        pattern = rf"{title}\s*[:\-]?\s*(.*?)(?=\n\s*[A-Z][A-Za-z\s]+:\s|\n\s*[A-Z][A-Za-z\s]+\n|$)"
+        # Group `title` so alternations (e.g. "A|B") don't break capture groups.
+        pattern = rf"(?:{title})\s*[:\-]?\s*(.*?)(?=\n\s*[A-Z][A-Za-z\s]+:\s|\n\s*[A-Z][A-Za-z\s]+\n|$)"
         match = re.search(pattern, report, flags=re.IGNORECASE | re.DOTALL)
-        return match.group(1).strip() if match else ""
+        if not match:
+            return ""
+        # Defensive guard: if a future regex edit removes capture groups,
+        # avoid raising and just fall back to an empty section.
+        if not match.lastindex or match.lastindex < 1:
+            return ""
+        return match.group(1).strip()
 
     def parse_list_block(block: str) -> list[str]:
         items = []
