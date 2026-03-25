@@ -59,7 +59,7 @@ Session state is used so the app preserves:
 
 - Python 3.10+
 - OpenAI API key
-- Optional: LaTeX installation with `pdflatex`
+- Optional: LaTeX installation with `pdflatex`, `xelatex`, or `lualatex`
 
 ### Install
 
@@ -97,5 +97,6 @@ streamlit run app.py
 ## Notes
 
 - Prompt files are unchanged; role guidance and output requirements are injected in `app.py`.
-- PDF generation uses two-pass `pdflatex` and will gracefully fallback to cached PDF when available.
+- PDF generation uses two-pass LaTeX compilation (`pdflatex` first, then `xelatex` or `lualatex` as fallback) and will gracefully fallback to cached PDF when available.
+- If PDF export is unavailable, install a TeX distribution and verify one compiler is on `PATH`, e.g. `pdflatex --version`.
 - Debug output is intentionally collapsed and low-visual-priority.
