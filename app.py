@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -555,24 +556,31 @@ def compute_diff_pairs(before: list[str], after: list[str]) -> list[tuple[str, s
 
 
 def compile_pdf(tex_content: str) -> tuple[bytes | None, str | None]:
+    latex_engine = next((engine for engine in ("pdflatex", "xelatex", "lualatex") if shutil.which(engine)), None)
+    if not latex_engine:
+        return None, (
+            "No LaTeX compiler found. Install a TeX distribution and ensure one of these commands is on PATH: "
+            "pdflatex, xelatex, or lualatex."
+        )
+
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             tex_path = tmp_path / "optimized_resume.tex"
             tex_path.write_text(tex_content, encoding="utf-8")
-            cmd = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
+            cmd = [latex_engine, "-interaction=nonstopmode", "-halt-on-error", tex_path.name]
             logs: list[str] = []
             for run_number in (1, 2):
                 result = subprocess.run(cmd, cwd=tmp_path, capture_output=True, text=True, timeout=90)
-                logs.append(f"--- pdflatex run {run_number} ---\n{result.stdout}\n{result.stderr}")
+                logs.append(f"--- {latex_engine} run {run_number} ---\n{result.stdout}\n{result.stderr}")
                 if result.returncode != 0:
                     return None, "\n".join(logs)
             pdf_path = tmp_path / "optimized_resume.pdf"
             return (pdf_path.read_bytes(), None) if pdf_path.exists() else (None, "PDF compilation reported success but no PDF file was produced.")
     except FileNotFoundError:
-        return None, "pdflatex is not installed in this environment."
+        return None, f"{latex_engine} is not installed in this environment."
     except subprocess.TimeoutExpired:
-        return None, "pdflatex timed out while compiling the LaTeX resume."
+        return None, f"{latex_engine} timed out while compiling the LaTeX resume."
     except Exception as exc:  # pragma: no cover
         return None, str(exc)
 
